@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run pytest*)",
+      "Bash(uv run ruff check*)",
+      "Bash(uv run python plan_issue.py*)",
+      "Bash(uv run python apply_highlights.py*--dry-run*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "WebFetch(domain:www.langchain.com)",
+      "WebFetch(domain:martinfowler.com)",
+      "WebFetch(domain:claude.com)",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:www.anthropic.com)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(git add *.pdf*)",
+      "Bash(rm -rf*)"
+    ]
+  }
+}

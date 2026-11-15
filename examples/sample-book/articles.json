@@ -1,0 +1,9 @@
+{
+  "pdf": "sample-book.pdf",
+  "split": {"approved": ["p1-2", "p3-4", "p5-6"], "unit": "book"},
+  "articles": [
+    {"id": "p1-2", "title": "第1章 キャッシュの基本", "section": "章", "first": 1, "last": 2, "chars": 401, "readable": "ok", "target": true, "name": "第1章キャッシュの基本", "note": "", "highlights": "highlights/p1-2.json"},
+    {"id": "p3-4", "title": "第2章 キャッシュの破棄", "section": "章", "first": 3, "last": 4, "chars": 355, "readable": "ok", "target": true, "name": "第2章キャッシュの破棄", "note": "", "highlights": "highlights/p3-4.json"},
+    {"id": "p5-6", "title": "第3章 運用と監視", "section": "章", "first": 5, "last": 6, "chars": 353, "readable": "ok", "target": false, "name": "第3章運用と監視", "note": "", "highlights": "highlights/p5-6.json"}
+  ]
+}

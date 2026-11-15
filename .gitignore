@@ -1,0 +1,35 @@
+# 雑誌PDF（巨大かつ著作物なので、元PDFも切り出し・ハイライト付きもコミットしない）
+*.pdf
+
+# 生成物。highlights/*.json から build_issue.py でいつでも作り直せる
+**/highlights/*.html
+
+# Claude が作業中に作る一時ファイル（本文の抜き出し、下書き、スクリプトなど）。中身はコミットしない
+# フォルダ自体は .gitkeep で残す（GitHub 上でも存在を確認できるように）
+work-gai/*
+!work-gai/.gitkeep
+
+# Python / uv
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.tmp
+
+# この PC 用の設定（権限の許可リストなど）
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 見張り（watch.py）が起動した Claude の経過
+**/claude-run.log
+**/claude-plan.log
+
+# 使用例のPDF（架空の内容。examples/make_sample.py で作った）だけはコミットする
+!examples/**/*.pdf
+
+# 作業フォルダ。読んだ本・雑誌の記録（引用を含む）が入るので、公開リポジトリにはコミットしない
+output/*
+!output/.gitkeep

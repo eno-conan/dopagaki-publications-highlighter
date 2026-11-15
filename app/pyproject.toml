@@ -1,0 +1,29 @@
+[project]
+name = "book-marker"
+version = "0.1.0"
+description = "Issue #526 のコメント（ページ番号＋引用）をもとに書籍PDFへハイライト注釈を付ける"
+requires-python = ">=3.11"
+dependencies = [
+    "pymupdf>=1.28.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.3",
+]
+
+[tool.uv]
+# ライブラリではなく単体で動かすコードなので、自身はインストールしない
+package = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,26 @@
+name: CI
+
+# PRを開いたとき（と開き直したとき）だけ走らせる。追加のpushでは走らない（コミット前のフックで確認する）
+# 手動で走らせたいときは、Actions の「Run workflow」から
+on:
+  pull_request:
+    types: [opened, reopened]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: app/uv.lock
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run python -m pytest

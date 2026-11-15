@@ -1,0 +1,9 @@
+#!/bin/sh
+# コミット前に、app/ の変更があれば、ruff と pytest が全件通るか確認する（通らなければコミットしない）。
+# 有効にする: git config core.hooksPath .githooks
+if git diff --cached --name-only | grep -q '^app/'; then
+  cd "$(git rev-parse --show-toplevel)/app" || exit 1
+  export PYTHONUTF8=1
+  uv run ruff check . || exit 1
+  uv run python -m pytest -q || exit 1
+fi

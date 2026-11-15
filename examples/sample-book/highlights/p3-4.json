@@ -1,0 +1,9 @@
+{
+  "meta": {"title": "第2章 キャッシュの破棄", "source_pdf": "sample-book.pdf（架空の本）"},
+  "highlights": [
+    {"page": 1, "text": "キャッシュの破棄とは、古くなったデータを取り除いて、最新の状態に保つことである。", "category": "definition", "reason": "破棄の定義"},
+    {"page": 1, "text": "手動で消す方法は正確だが、消し忘れると古い値が残り続けるという限界がある。", "category": "warning", "reason": "手動の破棄の限界"},
+    {"page": 1, "text": "有効期限と手動の破棄を組み合わせて使うのが実践的である。", "category": "principle", "reason": "この章の主張"},
+    {"page": 2, "text": "障害のときは、キャッシュを使わずに元のデータへ直接問い合わせる逃げ道を用意する。", "category": "practice", "reason": "障害への備え"}
+  ]
+}

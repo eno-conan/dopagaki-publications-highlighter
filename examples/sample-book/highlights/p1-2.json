@@ -1,0 +1,11 @@
+{
+  "meta": {"title": "第1章 キャッシュの基本", "source_pdf": "sample-book.pdf（架空の本）"},
+  "highlights": [
+    {"page": 1, "text": "キャッシュとは、よく使うデータを、取り出しやすい場所に一時的に置いておく仕組みである。", "category": "definition", "reason": "キャッシュの定義"},
+    {"page": 1, "text": "データに有効期限を付けるのが基本的な方針である。", "category": "principle", "reason": "古さを防ぐ基本方針"},
+    {"page": 1, "text": "有効期限を長くしすぎると、古い値を返し続けてしまうので注意が必要である。", "category": "warning", "reason": "期限が長すぎる場合の落とし穴"},
+    {"page": 1, "text": "有効期限を60秒にして、読み込みの回数を約8割減らした。", "category": "evidence", "reason": "著者の例示（効果の数値）"},
+    {"page": 2, "text": "読む回数が多く、書き換えが少ないものを選ぶ。", "category": "practice", "reason": "キャッシュに置くデータの選び方"},
+    {"page": 2, "text": "まず計測し、遅い箇所を確かめてから導入することが重要である。", "category": "practice", "reason": "導入の前にやること"}
+  ]
+}
