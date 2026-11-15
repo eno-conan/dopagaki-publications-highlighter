@@ -22,6 +22,7 @@ from pathlib import Path
 import build_issue
 import check_links
 import post_references
+import repo_guard
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -31,7 +32,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--plan", type=Path, required=True, help="articles.json")
     p.add_argument("--issue", type=int, help="参考文献を投稿する Issue の番号（省略時は投稿しない）")
     p.add_argument("--close", action="store_true", help="マーカーも投稿も問題なく終わったら、--issue の Issue を閉じる")
+    p.add_argument("--allow-public", action="store_true", help="書き込み先が公開リポジトリでも止めない（既定は止める）")
     args = p.parse_args(argv)
+    if args.issue is not None:
+        try:
+            repo_guard.require_private(args.allow_public)
+        except repo_guard.PublicRepoError as e:
+            print(f"エラー: {e}", file=sys.stderr)
+            return 1
 
     todo: list[str] = []
     failed = False  # Issue を閉じてよいか（マーカーの未適用・投稿の失敗があれば閉じない）

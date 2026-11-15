@@ -17,6 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import repo_guard
 from check_links import load_refs
 
 KINDS = {
@@ -89,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--post", action="store_true", help="実際に投稿する（--issue が要る）")
     p.add_argument("--update", action="store_true", help="すでにあるコメントを書き換える（--issue が要る）")
     p.add_argument("--sync", action="store_true", help="コメントがあれば書き換え、無ければ投稿する（--issue が要る）")
+    p.add_argument("--allow-public", action="store_true", help="書き込み先が公開リポジトリでも止めない（既定は止める）")
     args = p.parse_args(argv)
     try:
         data = load_refs(args.refs)
@@ -102,6 +104,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if not args.issue:
             raise ValueError("--post / --update / --sync には --issue が要ります")
+        repo_guard.require_private(args.allow_public)
         cid = find_comment_id(args.issue, args.refs.stem) if (args.update or args.sync) else None
         if args.update or (args.sync and cid is not None):
             if cid is None:

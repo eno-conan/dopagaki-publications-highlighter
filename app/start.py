@@ -22,6 +22,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import repo_guard
+
 ROOT = Path(__file__).resolve().parent.parent
 INBOX = ROOT / "inbox"
 OUTPUT = ROOT / "output"
@@ -108,9 +110,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--no-watch", action="store_true", help="回答待ちの見張り（別ウィンドウ）を起動しない（web.py が見張る）"
     )
+    p.add_argument("--allow-public", action="store_true", help="書き込み先が公開リポジトリでも止めない（既定は止める）")
     args = p.parse_args(argv)
 
     try:
+        if not args.dry_run:
+            repo_guard.require_private(args.allow_public)  # PDF を動かす前に、書き込み先を確かめる
         pdfs = inbox_pdfs()
         print(f"inbox の PDF: {len(pdfs)}件" + "".join(f"\n  - {p.name}" for p in pdfs))
         for pdf in pdfs:

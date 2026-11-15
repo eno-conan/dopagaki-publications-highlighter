@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+import repo_guard
 from ask_issue import (
     CHANGE,
     COLOR_CHOICES,
@@ -214,8 +215,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--wait", action="store_true", help="揃う（または分け方の変更が選ばれる）まで待つ")
     p.add_argument("--interval", type=int, default=120, help="待つときの確認間隔（秒）")
     p.add_argument("--timeout", type=int, default=6 * 3600, help="待つ最長の時間（秒）")
+    p.add_argument("--allow-public", action="store_true", help="書き込み先が公開リポジトリでも止めない（既定は止める）")
     args = p.parse_args(argv)
     try:
+        if args.apply:
+            repo_guard.require_private(args.allow_public)
         plan = json.loads(args.plan.read_text(encoding="utf-8"))
         deadline = time.monotonic() + args.timeout
         while True:

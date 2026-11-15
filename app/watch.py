@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 import read_answers
+import repo_guard
 
 # 無人で起動した Claude に許す操作（必要な分だけ）
 ALLOWED_TOOLS = (
@@ -87,7 +88,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--interval", type=int, default=120, help="確認間隔（秒）")
     p.add_argument("--timeout", type=int, default=24 * 3600, help="待つ最長の時間（秒）")
     p.add_argument("--dry-run", action="store_true", help="Claude を起動せず、コマンドを表示する")
+    p.add_argument("--allow-public", action="store_true", help="書き込み先が公開リポジトリでも止めない（既定は止める）")
     args = p.parse_args(argv)
+    try:
+        repo_guard.require_private(args.allow_public)
+    except repo_guard.PublicRepoError as e:
+        print(f"エラー: {e}", file=sys.stderr)
+        return 1
 
     code = read_answers.main(
         [

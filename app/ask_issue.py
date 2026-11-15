@@ -18,6 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import repo_guard
 from plan_issue import MIN_CHARS, SKIP_WORDS
 
 PURPOSES = {
@@ -144,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--emphasis", nargs="*", default=[], metavar="ID", help="重点にすることを提案する記事")
     p.add_argument("--create", action="store_true", help="Issue を作る")
     p.add_argument("--update", type=int, metavar="ISSUE", help="すでにある Issue の本文を、新しい分割案で書き換える")
+    p.add_argument("--allow-public", action="store_true", help="書き込み先が公開リポジトリでも止めない（既定は止める）")
     args = p.parse_args(argv)
     try:
         plan = json.loads(args.plan.read_text(encoding="utf-8"))
@@ -156,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
         if not (args.create or args.update):
             print(body)
             return 0
+        repo_guard.require_private(args.allow_public)
         if args.update:
             subprocess.run(
                 ["gh", "issue", "edit", str(args.update), "--body-file", "-"],
