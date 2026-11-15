@@ -148,7 +148,7 @@ dopagaki-publications-highlighter/
       highlights/<ID>.json               重要箇所の元データ
       references/<ID>.json               章・記事ごとの参考文献・関連リンク（確認結果つき）
       reading.json                       読み方の答え（目的・重点・使う色）
-      分割/<名前>.pdf                     記事を切り出しただけのPDF（マーカーなし。例: ORMで学ぶWeb開発のベストプラクティス.pdf）
+      分割/<名前>.pdf                     記事を切り出しただけのPDF（マーカーなし。例: サンプル連載.pdf）
       マーカー付き/<名前>.pdf             ★ 読むのはこれ（重要箇所を付けた記事）
     <書名>/                              書籍の作業フォルダ（中身は号と同じ）
 ```
@@ -332,7 +332,7 @@ uv sync
 
 | 目的 | コマンド |
 |---|---|
-| 記事を1つだけ切り出す | `uv run python split_pdf.py --pdf ../output/Sample-Magazine-2026年10月号/<号>.pdf --first 120 --last 126 --name 実録AIネイティブプロダクト開発`（出力は元PDFと同じフォルダに `<元名>_<name>.pdf`。`--out` で場所を指定できる） |
+| 記事を1つだけ切り出す | `uv run python split_pdf.py --pdf ../output/Sample-Magazine-2026年10月号/<号>.pdf --first 120 --last 126 --name サンプル連載`（出力は元PDFと同じフォルダに `<元名>_<name>.pdf`。`--out` で場所を指定できる） |
 | 重要箇所が PDF に一致するか確認 | `uv run python apply_highlights.py --pdf <切り出したPDF> --highlights <JSON> --dry-run` |
 | ハイライトだけ付ける | `uv run python apply_highlights.py --pdf <切り出したPDF> --highlights <JSON>`（出力: `<PDF名>の重要箇所.pdf`） |
 | 参考リンクを確認する | `uv run python check_links.py --refs ../output/<書名>/references/<ID>.json`（結果は JSON の `status` に書き戻る） |
