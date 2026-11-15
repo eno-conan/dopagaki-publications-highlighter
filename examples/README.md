@@ -6,7 +6,7 @@
 examples/
   make_sample.py                      ダミーPDFを作るスクリプト
   sample-book/
-    sample-book.pdf                   元PDF（しおり付き）
+    sample-book.pdf                   元PDF（章の目次＝しおり付き）
     articles.json                     章の一覧と判断（第3章は対象外、分け方は承認済みの状態）
     reading.json                      読み方の答え（目的・重点・使う色）
     highlights/<ID>.json              重要箇所（本文の引用、色のラベル、理由）
