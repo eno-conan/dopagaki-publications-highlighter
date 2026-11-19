@@ -26,6 +26,9 @@ Thumbs.db
 # 見張り（watch.py）が起動した Claude の経過
 **/claude-run.log
 **/claude-plan.log
+**/claude-change.log
+**/claude-change.hash
+**/claude-stopped.json
 
 # 使用例のPDF（架空の内容。examples/make_sample.py で作った）だけはコミットする
 !examples/**/*.pdf

@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+import issue_io
 import repo_guard
 from ask_issue import (
     CHANGE,
@@ -97,8 +98,10 @@ def parse_body(body: str) -> Answers:
     return a
 
 
-def resolve(a: Answers, titles: dict[str, str], note: str = "", today: str | None = None) -> Result:
-    if a.change:
+def resolve(
+    a: Answers, titles: dict[str, str], note: str = "", today: str | None = None, ignore_change: bool = False
+) -> Result:
+    if a.change and not ignore_change:
         return Result("change", ["「分け方を変えたい」が選ばれています。コメントを読んで、分け方を直してください"])
     problems: list[str] = []
     if not a.start:
@@ -175,7 +178,7 @@ def apply_and_comment(plan_path: Path, plan: dict, result: Result, issue: int) -
 
 
 def fetch_issue(issue: int) -> tuple[str, str]:
-    """Issue の本文と、人が書いたコメント（自動投稿の `<!--` で始まるものを除く）を返す。"""
+    """Issue の本文と、人が書いたコメント（自動投稿や Claude の `<!--` で始まるものを除く。issue_io.who）を返す。"""
     out = subprocess.run(
         ["gh", "issue", "view", str(issue), "--json", "body,comments"],
         capture_output=True,
@@ -184,12 +187,18 @@ def fetch_issue(issue: int) -> tuple[str, str]:
         check=True,
     )
     data = json.loads(out.stdout)
-    notes = [c["body"].strip() for c in data["comments"] if not c["body"].lstrip().startswith("<!--")]
+    notes = [c["body"].strip() for c in data["comments"] if issue_io.who(c["body"]) == "human"]
     return data["body"], "\n\n".join(n for n in notes if n)
 
 
-def evaluate(plan: dict, issue: int) -> Result:
+def evaluate(plan: dict, issue: int, ignore_change: bool = False) -> Result:
+    """ignore_change: 「分け方を変えたい」を、コメントを読んだ Claude が「補足だけ」と判断したときだけ使う。"""
     body, note = fetch_issue(issue)
+    return evaluate_body(plan, body, note, ignore_change)
+
+
+def evaluate_body(plan: dict, body: str, note: str = "", ignore_change: bool = False) -> Result:
+    """Issue の本文（まだ書き込んでいないものでもよい）から、回答が揃っているかを判定する。"""
     a = parse_body(body)
     current = [x["id"] for x in plan["articles"]]
     if a.plan_ids and a.plan_ids != current:
@@ -198,7 +207,7 @@ def evaluate(plan: dict, issue: int) -> Result:
             ["Issue の分割案が articles.json と違います（分け方を変えたあとは Issue を作り直してください）"],
         )
     titles = {x["id"]: x["title"].replace("　", " ") for x in plan["articles"]}
-    return resolve(a, titles, note)
+    return resolve(a, titles, note, ignore_change=ignore_change)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -215,6 +224,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--wait", action="store_true", help="揃う（または分け方の変更が選ばれる）まで待つ")
     p.add_argument("--interval", type=int, default=120, help="待つときの確認間隔（秒）")
     p.add_argument("--timeout", type=int, default=6 * 3600, help="待つ最長の時間（秒）")
+    p.add_argument(
+        "--ignore-change",
+        action="store_true",
+        help="「分け方を変えたい」のチェックを無視する（コメントを読んで、補足だけだと確かめたときだけ）",
+    )
     p.add_argument("--allow-public", action="store_true", help="書き込み先が公開リポジトリでも止めない（既定は止める）")
     args = p.parse_args(argv)
     try:
@@ -223,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         plan = json.loads(args.plan.read_text(encoding="utf-8"))
         deadline = time.monotonic() + args.timeout
         while True:
-            result = evaluate(plan, args.issue)
+            result = evaluate(plan, args.issue, args.ignore_change)
             if result.status != "incomplete" or not args.wait or time.monotonic() >= deadline:
                 break
             time.sleep(args.interval)

@@ -243,10 +243,59 @@ def test_merge_errors(tmp_path, capsys, ids, message):
     assert (tmp_path / "articles.json").read_text(encoding="utf-8") == before
 
 
-def test_merge_is_only_for_books(tmp_path, capsys):
+def test_merge_works_for_magazines_and_is_kept_on_rerun(tmp_path):
     pdf = make_issue(tmp_path / "号.pdf")
-    assert plan_issue.main(["--pdf", str(pdf), "--merge", "p3-5", "p6-7"]) == 1
-    assert "書籍" in capsys.readouterr().err
+    assert plan_issue.main(["--pdf", str(pdf), "--include", "p8-9"]) == 0
+    assert plan_issue.main(["--pdf", str(pdf), "--merge", "p3-5", "p6-7"]) == 0
+    articles = {a["id"]: a for a in read_plan(tmp_path)["articles"]}
+    assert (articles["p3-7"]["first"], articles["p3-7"]["last"]) == (3, 7)
+    assert articles["p3-7"]["merged"] == ["p3-5", "p6-7"] and "ranges" not in articles["p3-7"]
+    assert plan_issue.main(["--pdf", str(pdf)]) == 0  # 再実行しても、合体と他の判断を保つ
+    again = {a["id"]: a for a in read_plan(tmp_path)["articles"]}
+    assert "p3-7" in again and "p3-5" not in again and again["p8-9"]["target"] is True
+
+
+def test_join_makes_one_article_from_separate_ranges(tmp_path, capsys):
+    pdf = make_issue(tmp_path / "号.pdf")
+    assert plan_issue.main(["--pdf", str(pdf), "--join", "p3-5", "p8-9"]) == 0
+    assert "3-5, 8-9（5p）" in capsys.readouterr().out
+    articles = read_plan(tmp_path)["articles"]
+    joined = next(a for a in articles if a.get("ranges"))
+    assert joined["id"] == "p3-9j" and joined["ranges"] == [[3, 5], [8, 9]]
+    assert joined["merged"] == ["p3-5", "p8-9"] and joined["highlights"] == "highlights/p3-9j.json"
+    assert "p6-7" in [a["id"] for a in articles]  # 間の記事は含めず、そのまま残る
+    assert plan_issue.main(["--pdf", str(pdf)]) == 0
+    assert any(a.get("ranges") for a in read_plan(tmp_path)["articles"])  # 再実行しても保つ
+
+
+def test_join_then_merge_neighbour_keeps_gap(tmp_path):
+    pdf = make_issue(tmp_path / "号.pdf")
+    assert plan_issue.main(["--pdf", str(pdf), "--join", "p3-5", "p8-9"]) == 0
+    assert plan_issue.main(["--pdf", str(pdf), "--join", "p3-9j", "p10"]) == 0
+    joined = next(a for a in read_plan(tmp_path)["articles"] if a.get("ranges"))
+    assert joined["ranges"] == [[3, 5], [8, 9], [10, 10]]
+
+
+def test_join_errors(tmp_path, capsys):
+    pdf = make_issue(tmp_path / "号.pdf")
+    assert plan_issue.main(["--pdf", str(pdf), "--join", "p8-9", "p3-5"]) == 1
+    assert "順" in capsys.readouterr().err
+    assert plan_issue.main(["--pdf", str(pdf), "--join", "p3-5"]) == 1
+    assert "2つ以上" in capsys.readouterr().err
+
+
+def test_joined_article_is_split_with_only_its_pages(tmp_path):
+    import split_pdf
+
+    pdf = make_issue(tmp_path / "号.pdf")
+    assert plan_issue.main(["--pdf", str(pdf), "--join", "p3-5", "p8-9", "--include", "p3-9j"]) == 0
+    assert split_pdf.main(["--plan", str(tmp_path / "articles.json")]) == 0
+    out = next((tmp_path / "分割").glob("*.pdf"))
+    doc = pymupdf.open(out)
+    try:
+        assert doc.page_count == 5
+    finally:
+        doc.close()
 
 
 def test_approval_status_is_reported_but_never_written_by_plan_issue(tmp_path, capsys):

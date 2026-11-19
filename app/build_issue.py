@@ -17,8 +17,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from apply_highlights import apply_highlights, load_document
+from contents_page import add_contents_page
 from mark_pdf import write_annotated_copy
-from split_pdf import article_name, excerpt_path, extract_pages, file_stem, markers_path
+from split_pdf import article_name, article_ranges, excerpt_path, extract_ranges, file_stem, markers_path
 
 
 @dataclass
@@ -32,7 +33,8 @@ class Built:
 
 def build_article(base: Path, plan_dir: Path, article: dict) -> Built:
     name = article_name(article)
-    pages = article["last"] - article["first"] + 1
+    ranges = article_ranges(article)
+    pages = sum(last - first + 1 for first, last in ranges)
     json_path = plan_dir / (article.get("highlights") or f"highlights/{article['id']}.json")
     if not json_path.is_file():
         return Built(article["id"], name, pages, "重要箇所が未選定（PDFは作らない）")
@@ -41,13 +43,15 @@ def build_article(base: Path, plan_dir: Path, article: dict) -> Built:
     doc = load_document(json_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     extract = excerpt_path(plan_dir, article)  # 切り出しただけのPDFも `分割/` に残す（あとで移動しやすいように）
-    extract_pages(base, article["first"], article["last"], extract)
+    extract_ranges(base, ranges, extract)
     results = write_annotated_copy(extract, out, lambda d: apply_highlights(d, doc.highlights, dry_run=False))
+    toc = add_contents_page(out, article) if article.get("merged") else False  # 合体した記事は、先頭に目次ページ
     applied = sum(1 for r in results if r.applied)
     unmatched = len(results) - applied
     status = f"ハイライト {applied}/{len(results)}件 → {out.parent.name}/{out.name}" + (
         f"（未適用 {unmatched}件）" if unmatched else ""
     )
+    status += "（先頭に目次ページ）" if toc else ""
     return Built(article["id"], name, pages, status, unmatched)
 
 

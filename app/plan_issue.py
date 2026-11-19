@@ -9,7 +9,8 @@
     uv run python plan_issue.py --pdf ../output/<書名>/<書名>.pdf --unit book             # しおりの階層1を章にする
     uv run python plan_issue.py --pdf ... --unit book --chapter-level 2            # 階層2を章にする
     uv run python plan_issue.py --pdf ... --ranges 10-35:第1章データ 36-60:第2章   # しおりがないとき、手で範囲を指定
-    uv run python plan_issue.py --pdf ... --merge p10-35 p36-60                    # 隣接する章を合体（3章以上は警告）
+    uv run python plan_issue.py --pdf ... --merge p10-35 p36-60                    # 隣接する章・記事を合体（雑誌も可）
+    uv run python plan_issue.py --pdf ... --join p146-151 p152-158 p166-171        # 離れた記事を、間を含めず1つに
 
 判断は articles.json の `target`（true=対象 / false=対象外 / null=未判断）に残る。再実行しても判断は消えない。
 文字が取れない記事（広告・画像・文字化け）は、最初から対象外にする（--include で戻せる）。
@@ -54,9 +55,18 @@ class Article:
     highlights: str = ""  # 重要箇所JSONの相対パス
     merged: list[str] = field(default_factory=list)  # 合体した元の章のID（合体していなければ空）
 
+    ranges: list[list[int]] = field(default_factory=list)  # 離れた記事を合体したときの、元のページ範囲の並び
+    parts: list[dict] = field(default_factory=list)  # 合体した元の記事（id・title・first・last）。目次ページに使う
+
     @property
     def pages(self) -> int:
+        if self.ranges:
+            return sum(last - first + 1 for first, last in self.ranges)
         return self.last - self.first + 1
+
+    @property
+    def page_ranges(self) -> list[list[int]]:
+        return self.ranges or [[self.first, self.last]]
 
     @classmethod
     def from_dict(cls, d: dict) -> Article:
@@ -209,31 +219,57 @@ def parse_ranges(doc: pymupdf.Document, specs: list[str]) -> list[Article]:
 
 
 def merge_articles(
-    doc: pymupdf.Document, articles: list[Article], ids: list[str], name: str | None = None
+    doc: pymupdf.Document,
+    articles: list[Article],
+    ids: list[str],
+    name: str | None = None,
+    *,
+    join: bool = False,
 ) -> list[Article]:
-    """隣接する記事（章）を1つに合体する。合体してよいのは隣接するもの。3章以上は警告になる（format_warnings）。"""
+    """記事（章）を1つに合体する。3章以上は警告になる（format_warnings）。
+
+    既定は、隣接する記事だけ（連続したページ範囲の1記事になる）。
+    join=True のときは、離れた記事も1つにする（間の記事は含めない）。
+    ページ範囲は `ranges` に残り、IDは `p<最初>-<最後>j`。
+    """
     index = {a.id: i for i, a in enumerate(articles)}
     unknown = [i for i in ids if i not in index]
     if unknown:
         raise ValueError(f"記事 {', '.join(unknown)} が見つかりません（例: {', '.join(list(index)[:3])}）")
     if len(ids) < 2:
-        raise ValueError("--merge には、合体する記事のIDを2つ以上指定してください")
+        raise ValueError("--merge / --join には、合体する記事のIDを2つ以上指定してください")
     positions = [index[i] for i in ids]
-    if positions != list(range(positions[0], positions[0] + len(ids))):
-        raise ValueError(f"{', '.join(ids)} は隣接していません（一覧の並びで連続する記事だけ合体できます）")
-    parts = articles[positions[0] : positions[-1] + 1]
+    if join:
+        if positions != sorted(set(positions)):
+            raise ValueError(f"{', '.join(ids)} は、一覧の並びの順に、重複なく指定してください")
+    elif positions != list(range(positions[0], positions[0] + len(ids))):
+        raise ValueError(
+            f"{', '.join(ids)} は隣接していません（一覧の並びで連続する記事だけ --merge で合体できます。"
+            "離れた記事は --join）"
+        )
+    parts = [articles[p] for p in positions]
+    title = "+".join(a.title for a in parts)
+    name = name or "+".join(a.name for a in parts)
     first, last = parts[0].first, parts[-1].last
-    merged = make_article(
-        doc,
-        "+".join(a.title for a in parts),
-        parts[0].section,
-        first,
-        last,
-        name or "+".join(a.name for a in parts),
-    )
+    merged = make_article(doc, title, parts[0].section, first, last, name)
+    gapped = join or any(a.ranges for a in parts)  # 離れた範囲を持つ（間のページは含めない）
+    if gapped:
+        merged.id = f"{article_id(first, last)}j"
+        merged.highlights = f"highlights/{merged.id}.json"
+        merged.ranges = [list(r) for a in parts for r in a.page_ranges]
+        stats = [page_stats(doc, f, last_) for f, last_ in merged.ranges]
+        merged.chars = sum(c for c, _ in stats)
+        merged.readable = readable_of(merged.chars, sum(g for _, g in stats), merged.pages)
     merged.merged = [i for a in parts for i in (a.merged or [a.id])]
+    merged.parts = [
+        p for a in parts for p in (a.parts or [{"id": a.id, "title": a.title, "first": a.first, "last": a.last}])
+    ]
     merged.note = "合体: " + "+".join(a.title for a in parts)
-    return [*articles[: positions[0]], merged, *articles[positions[-1] + 1 :]]
+    if gapped:
+        merged.note += "（離れた記事を、間を含めずに1つにしたもの）"
+    used = set(positions)
+    rest = [a for i, a in enumerate(articles) if i > positions[0] and i not in used]
+    return [*articles[: positions[0]], merged, *rest]
 
 
 MIN_PAGES = 30  # これ未満の単位は、隣の章と合体する（PDF を何度も開閉しなくて済むように）
@@ -368,6 +404,10 @@ def article_dict(a: Article) -> dict:
     d = asdict(a)
     if not d["merged"]:  # 合体していない記事（雑誌など）の articles.json は、これまでの形のまま
         del d["merged"]
+    if not d["ranges"]:  # 離れた記事を合体したときだけ持つ
+        del d["ranges"]
+    if not d["parts"]:  # 合体した記事だけ持つ
+        del d["parts"]
     return d
 
 
@@ -411,7 +451,10 @@ def format_table(articles: list[Article]) -> str:
     rows = ["| ID | ページ | 区分 | タイトル | 文字 | 判断 |", "|---|---|---|---|---|---|"]
     for a in articles:
         title = a.title.split("......")[0].strip()
-        pages = f"{a.first}-{a.last}（{a.pages}p）" if a.pages > 1 else f"{a.first}（1p）"
+        if a.ranges:
+            pages = ", ".join(f"{f}-{last}" for f, last in a.ranges) + f"（{a.pages}p）"
+        else:
+            pages = f"{a.first}-{a.last}（{a.pages}p）" if a.pages > 1 else f"{a.first}（1p）"
         rows.append(f"| {a.id} | {pages} | {a.section} | {title} | {READABLE_LABEL[a.readable]} | {target_mark(a)} |")
     return "\n".join(rows)
 
@@ -442,7 +485,14 @@ def main(argv: list[str] | None = None) -> int:
         metavar="FIRST-LAST:章名",
         help="しおりがない書籍用。手でページ範囲を指定する（例: 10-35:第1章データ）。book になる",
     )
-    p.add_argument("--merge", nargs="*", default=[], metavar="ID", help="book のとき、隣接する章のIDを合体する")
+    p.add_argument("--merge", nargs="*", default=[], metavar="ID", help="隣接する記事（章）のIDを合体する")
+    p.add_argument(
+        "--join",
+        nargs="*",
+        default=[],
+        metavar="ID",
+        help="離れた記事のIDを、間の記事を含めずに1つにまとめる（一覧の順に指定。IDは p<最初>-<最後>j になる）",
+    )
     p.add_argument(
         "--auto-merge",
         action="store_true",
@@ -456,19 +506,22 @@ def main(argv: list[str] | None = None) -> int:
         out = args.out or args.pdf.with_name(PLAN_NAME)
         old, old_split = load_plan(out), load_split(out)
         unit = args.unit or (old_split or {}).get("unit") or ("book" if args.ranges else "magazine")
-        if (args.merge or args.auto_merge) and unit != "book":
-            raise ValueError("--merge / --auto-merge は書籍（--unit book）だけで使えます")
+        if args.auto_merge and unit != "book":
+            raise ValueError("--auto-merge は書籍（--unit book）だけで使えます")
         doc = open_pdf(args.pdf)
         try:
+            keep = unit == "book" or any(d.get("merged") for d in old)  # 雑誌は、合体したものがあるときだけ保つ
             if args.ranges:
                 articles = parse_ranges(doc, args.ranges)
-            elif unit == "book" and old and not args.rebuild:
+            elif keep and old and not args.rebuild:
                 articles = [Article.from_dict(d) for d in old]  # 合体・範囲指定を保つ
             else:
                 articles = build_articles(doc, unit, args.chapter_level)
             articles = merge_decisions(articles, old)
             if args.merge:
                 articles = merge_articles(doc, articles, args.merge)
+            if args.join:
+                articles = merge_articles(doc, articles, args.join, join=True)
             if args.auto_merge:
                 for ids in plan_auto_merge(articles):
                     articles = merge_articles(doc, articles, ids, short_name(articles, ids))
@@ -476,7 +529,7 @@ def main(argv: list[str] | None = None) -> int:
             doc.close()
         decide(articles, args.include, args.exclude)
         split = None
-        if old_split is not None or args.unit or unit != "magazine":
+        if old_split is not None or args.unit or unit != "magazine" or any(a.merged for a in articles):
             split = {"approved": [], **(old_split or {}), "unit": unit}  # approved は人の判断なので書き換えない
         save_plan(out, args.pdf, articles, split)
     except (ValueError, OSError, json.JSONDecodeError) as e:

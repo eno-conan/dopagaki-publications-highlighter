@@ -62,3 +62,27 @@ def test_plan_command_is_limited_and_names_the_issue_after_the_folder():
 def test_watch_command_quotes_paths_with_japanese_and_spaces():
     text = start.watch_command(Path("C:/a b/要件/articles.json"), 20)
     assert 'watch.py --plan "C:' in text and "--issue 20" in text and text.endswith("& pause")
+
+
+def test_clean_scratch_removes_only_the_book_folder_inside_work_gai(tmp_path, monkeypatch):
+    work = tmp_path / "work-gai"
+    (work / "号" / "sub").mkdir(parents=True)
+    (work / "号" / "sub" / "p1.txt").write_text("x", encoding="utf-8")
+    (work / "別の号").mkdir()
+    monkeypatch.setattr(start, "WORK", work)
+    assert start.clean_scratch("号") and not (work / "号").exists()
+    assert (work / "別の号").is_dir()  # ほかの本・号の一時フォルダは残す
+    assert not start.clean_scratch("号")  # もう無い
+    assert (
+        not start.clean_scratch("") and not start.clean_scratch("..") and work.is_dir()
+    )  # work-gai/ そのものや外は消さない
+
+
+def test_prompts_point_to_the_per_book_scratch_folder(tmp_path):
+    import watch
+
+    plan = tmp_path / "output" / "号" / "articles.json"
+    plan.parent.mkdir(parents=True)
+    assert "`work-gai/号/`" in watch.build_prompt(plan, 5, 5, tmp_path)
+    assert "`work-gai/号/`" in watch.build_change_prompt(plan, 5, 5, tmp_path)
+    assert "`work-gai/本/`" in start.PLAN_PROMPT.format(stem="本")

@@ -87,6 +87,7 @@ flowchart LR
 flowchart TD
     BAT["作業開始.bat"] -.-> WEB["web.py<br/>ブラウザの画面"]
     WEB --> START["start.py<br/>取り込みを始める"]
+    WEB --> IO["issue_io.py<br/>回答フォーム・やりとり"]
     START -. "claude -p" .-> PLANAI["Claude<br/>分割案・本文の把握・質問の Issue"]
     PLANAI -. "実行" .-> PLAN["plan_issue.py<br/>分割案"]
     PLANAI -. "実行" .-> ASK["ask_issue.py<br/>質問の Issue"]

@@ -27,25 +27,53 @@ import repo_guard
 ROOT = Path(__file__).resolve().parent.parent
 INBOX = ROOT / "inbox"
 OUTPUT = ROOT / "output"
+WORK = ROOT / "work-gai"  # 一時ファイルの置き場所（コミットしない）
+
+
+def scratch_dir(name: str) -> Path:
+    """本・号ごとの一時フォルダ（本文の抜き出し・下書き・使い捨てのスクリプト）。作業が終わったら clean_scratch で消す。"""
+    return WORK / name
+
+
+def clean_scratch(name: str) -> bool:
+    """本・号の一時フォルダを消す。消したら True。work-gai/ の外や、work-gai/ そのものは消さない。"""
+    folder = scratch_dir(name).resolve()
+    if not name or folder.parent != WORK.resolve() or not folder.is_dir():
+        return False
+    shutil.rmtree(folder)
+    return True
+
+
 ISSUE_TITLE = "取り込み確認: "
 
 # 分割案・質問の Issue まで進める Claude に許す操作
-PLAN_TOOLS = ("Read", "Write", "Edit", "Glob", "Grep", "Bash(uv run python *)", "Bash(gh issue *)")
+PLAN_TOOLS = (
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    "Grep",
+    "Bash(uv run python *)",
+    "Bash(uv run --directory app python *)",
+    "Bash(gh issue *)",
+)
 
 PLAN_PROMPT = """\
 `inbox/` に置かれた PDF を `output/{stem}/{stem}.pdf` に移してあります（中身は書き換えていません）。
 AGENTS.md と docs/workflow.md の「自動で進める」の手順に従い、質問の Issue を作るところまで進めてください。
 
-1. `app/` で `uv run python plan_issue.py --pdf ../output/{stem}/{stem}.pdf` で分割案を作る
+1. `uv run --directory app python plan_issue.py --pdf ../output/{stem}/{stem}.pdf` で分割案を作る
    - 書籍（章に分かれた本）は `--unit book --auto-merge` を付ける。雑誌は付けない
    - しおりが無くて作れないときは、人に章名とページ範囲を聞く必要がある。Issue は作らず、その旨を報告して終了する
 2. 対象の本文を読んで把握し、読み方の推奨（目的、重点にする章）を決める
-3. `uv run python ask_issue.py --plan ../output/{stem}/articles.json --title "{stem}" --purpose <目的> --emphasis <重点のID> --create` で、質問の Issue を作る
+3. `uv run --directory app python ask_issue.py --plan ../output/{stem}/articles.json --title "{stem}" --purpose <目的> --emphasis <重点のID> --create` で、質問の Issue を作る
    - Issue のタイトルは、必ず「取り込み確認: {stem}」になる（`--title` は `{stem}` のままにする）
 4. 作った Issue の番号とリンク、分割案の件数を、日本語で短く報告する
 
 重要箇所の選定は、まだ始めない（人が回答してから、見張りが続きを進める）。人の判断（分け方の承認・対象・読み方）は決めない。
-作業中に作る一時ファイルは、リポジトリ直下の `work-gai/` に作る。
+作業中に作る一時ファイル（本文の抜き出し・下書き・使い捨てのスクリプト）は、`work-gai/{stem}/` に作る（作業が終わると自動で消える）。
+Issue にコメントを書くときは、本文の1行目を必ず `<!-- claude -->` だけにする（人のコメントと見分けるため）。
+Bash は、1回に1つのコマンドだけを実行する（`cd` や `&&`・`|` でつながない。許可されず、作業がそこで止まる）。ファイルの中身は Read で読む。
 """
 
 

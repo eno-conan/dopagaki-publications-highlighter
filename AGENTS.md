@@ -32,7 +32,7 @@
 
 人にも共通のルール（PDFをコミットしない、JSON が正、色とラベルの定義の置き場所、`target` と `split.approved` は人の判断、選定基準を読む）は [CONTRIBUTING.md](CONTRIBUTING.md)。ここには、AI が特に守ることを書く。
 
-- **作業中に作る一時ファイル（本文の抜き出し、下書き、使い捨てのスクリプトなど）は、リポジトリ直下の `work-gai/` に作る**。`work-gai/` の中身は `.gitignore` 済みでコミットしない（フォルダ自体は `.gitkeep` で残してある）。成果物（`articles.json`、`highlights/`、`references/`、`reading.json`）と、ツールの本体（`app/`、`docs/`）以外を、ほかの場所に置かない
+- **作業中に作る一時ファイル（本文の抜き出し、下書き、使い捨てのスクリプトなど）は、本・号ごとに `work-gai/<本・号の名前>/` に作る**（`pipeline.py --close` で Issue を閉じると、自動で消える。本・号に関係しない作業の一時ファイルは、終わったら自分で消す）。`work-gai/` の中身は `.gitignore` 済みでコミットしない（フォルダ自体は `.gitkeep` で残してある）。成果物（`articles.json`、`highlights/`、`references/`、`reading.json`）と、ツールの本体（`app/`、`docs/`）以外を、ほかの場所に置かない
 - 元PDF（作業フォルダ直下の、名前に `_` を含まないPDF。`inbox/` に置かれたPDFも）は書き換えない。出力は必ずコピーに対して行う
 - `articles.json` の `target` は、ユーザーに聞かずに変えない
 - **分け方（記事・章の単位とページ範囲）は、人の承認を得るまで、切り出しも重要箇所の選定も始めない**。承認は、チャット、または Issue の最後の「作業開始OK」で行う（変えたいときだけ「分け方を変えたい」を付けてもらう）。流れは [docs/workflow.md](docs/workflow.md) の「書籍を取り込む手順」。分割案はID・ページ範囲・ページ数・章名・合体箇所を一覧にして見せる
@@ -50,6 +50,7 @@
 コマンド（`app/` で実行）、テスト、コミットのルールは [CONTRIBUTING.md](CONTRIBUTING.md)。変更したら `uv run pytest` と `uv run ruff check .` を通す。
 
 - 返答・コメント・コミットメッセージは日本語で書く
+- **画面（`app/web.py` など、ブラウザに出す HTML・CSS・JS）を作る・変えるときは、`fixing-accessibility` スキル（`.claude/skills/fixing-accessibility/`）の基準に従う**。ボタン・入力欄・ダイアログ・フォームの追加や変更、フォーカスやキーボード操作に触れるときは、ユーザーに言われなくても、先にスキルを読んで適用する。既存の画面を直すときは、無関係な部分まで書き換えず、最小限の修正にとどめる
 
 ## 全体像
 
@@ -61,10 +62,13 @@
 - `check_links.py`: 参考文献JSON（`references/<ID>.json`）のリンクを取得して確認する（404・ログイン必須・ボット扱いを除く）
 - `post_references.py`: 確認できたリンクだけを、章ごとに Issue のコメントとして投稿する（`--sync` で、あれば書き換え・無ければ投稿）
 - `ask_issue.py` / `read_answers.py`: 分け方の承認・対象・読み方を1つの Issue で聞き、チェックを `articles.json` と `reading.json` に写す
-- `web.py`（リポジトリ直下の `作業開始.bat` から起動）: ブラウザからの PDF アップロード（`inbox/` に保存）と、状況表示のローカル画面。取り込みの開始に `start.py` を使う（127.0.0.1 のみ）
+- `web.py`（リポジトリ直下の `作業開始.bat` から起動）: ブラウザからの PDF アップロード（`inbox/` に保存）と、状況表示・回答フォーム・Claude とのやりとり・通知のローカル画面。取り込みの開始に `start.py` を使う（127.0.0.1 のみ）
+- `issue_io.py`: 画面から質問の Issue を読み書きする部品（回答フォームの項目、チェックの書き戻し、コメントの書き手の区別）。Issue が正
+- Claude が Issue に書くコメントは、1行目を `<!-- claude -->` にする（人のコメントと見分けるため。`read_answers.py` は印の無いものだけを人の補足として読む）
 - `start.py`: `inbox/` の PDF を移し、分割案と質問の Issue まで進め、回答待ちの見張り（`watch.py`）を別ウィンドウで起動する（ローカル限定）
 - `watch.py`: 「作業開始OK」を待って反映し、許可を絞った Claude（`claude -p`）を起動して続きを進める（ローカル限定）
 - `pipeline.py`: `build_issue.py` → `check_links.py` → `post_references.py --sync` を続けて行う
+- `ui_tour.py`: 画面を Playwright で一通り操作し、各画面のスクリーンショットを `work-gai/ui-tour/ui-tour.pdf` にまとめる（GitHub・Claude にはつながない。画面を変えたら、これで見た目を確かめる）
 
 `mark_pdf.py` を単体で動かす「Issueのコメントから付ける」使い方は、`build_issue.py` の流れには含まれない。
 

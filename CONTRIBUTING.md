@@ -52,6 +52,7 @@ uv run python build_issue.py --plan ../output/<PDF名>/articles.json
 - 書籍は、章に分ける案を作り、人が分け方を承認してから切り出す（PDF は `inbox/` に置く）。コマンドは [docs/workflow.md](docs/workflow.md) の「書籍を取り込む手順」
 - 質問の Issue、回答の反映、参考文献の投稿までを続けて行うコマンドは、[docs/workflow.md](docs/workflow.md) の「自動で進める」
 - 実際に動かした例は [examples/](examples/README.md)（架空の本。`uv run python build_issue.py --plan ../examples/sample-book/articles.json`）
+- **画面の見た目を確かめる**: `uv run python ui_tour.py`（`--open` で、作ったあと開く）。Playwright が画面を一通り操作し（アップロード → 回答 → 返事待ち → 作業中 → 中断・再開 → 完了 → 再アップロードの警告、ダークモード、スマホの幅）、スクリーンショットを `work-gai/ui-tour/ui-tour.pdf` にまとめる。サンプルの PDF（`examples/sample-book/`）を使い、GitHub にも Claude にもつながない。初回だけ `uv run playwright install chromium` でブラウザを入れる
 - Issue への書き込み（`ask_issue.py --create`、`post_references.py --post`、`pipeline.py --issue` など）は、git の `origin` が公開リポジトリのとき、止まる。意図して書くときだけ `--allow-public`（または環境変数 `BOOK_MARKER_ALLOW_PUBLIC=1`）を付ける
 
 ## コミットするもの・しないもの

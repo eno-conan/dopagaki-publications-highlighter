@@ -88,21 +88,36 @@ def shift_toc(toc: list[list], first: int, last: int) -> list[list]:
     return shifted
 
 
+def article_ranges(article: dict) -> list[tuple[int, int]]:
+    """記事のページ範囲。離れた記事を合体したもの（`ranges`）は複数、ふつうは first〜last の1つ。"""
+    if article.get("ranges"):
+        return [(int(f), int(last)) for f, last in article["ranges"]]
+    return [(article["first"], article["last"])]
+
+
 def extract_pages(pdf: Path, first: int, last: int, out: Path) -> int:
     """pdf の first〜last ページ（1始まり、両端含む）を out に保存し、ページ数を返す。"""
+    return extract_ranges(pdf, [(first, last)], out)
+
+
+def extract_ranges(pdf: Path, ranges: list[tuple[int, int]], out: Path) -> int:
+    """pdf の複数のページ範囲（1始まり、両端含む）を、並べて1つの out に保存し、ページ数を返す。"""
     if out.resolve() == pdf.resolve():
         raise ValueError("--out が元PDFと同じです。元PDFは上書きしません")
     src = open_pdf(pdf)
     try:
-        if not 1 <= first <= last <= src.page_count:
-            raise ValueError(f"ページ範囲 {first}-{last} が不正です（全{src.page_count}ページ）")
+        for first, last in ranges:
+            if not 1 <= first <= last <= src.page_count:
+                raise ValueError(f"ページ範囲 {first}-{last} が不正です（全{src.page_count}ページ）")
         new = pymupdf.open()
         try:
             out.parent.mkdir(parents=True, exist_ok=True)
-            new.insert_pdf(src, from_page=first - 1, to_page=last - 1)
-            toc = shift_toc(src.get_toc(simple=False), first, last)
-            if toc:
-                new.set_toc(toc)
+            for first, last in ranges:
+                new.insert_pdf(src, from_page=first - 1, to_page=last - 1)
+            if len(ranges) == 1:  # 離れた範囲の合体は、しおりを引き継がない
+                toc = shift_toc(src.get_toc(simple=False), *ranges[0])
+                if toc:
+                    new.set_toc(toc)
             tmp = out.with_name(out.name + ".tmp")
             try:
                 new.save(tmp, garbage=3, deflate=True)  # 新規ファイルなので未使用オブジェクトも落として小さくする
@@ -130,7 +145,7 @@ def split_plan(plan_path: Path, only: list[str]) -> int:
         raise ValueError("対象の記事がありません（plan_issue.py --include で対象にしてください）")
     for a in targets:
         out = excerpt_path(plan_path.parent, a)
-        count = extract_pages(pdf, a["first"], a["last"], out)
+        count = extract_ranges(pdf, article_ranges(a), out)
         size_mb = out.stat().st_size / 1024 / 1024
         print(f"{a['id']:<10} {count:>3}ページ {size_mb:>5.1f}MB  {out.parent.name}/{out.name}")
     print(f"{len(targets)}記事を切り出しました")

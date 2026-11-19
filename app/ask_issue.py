@@ -61,8 +61,11 @@ def recommended_ids(articles: list[dict]) -> list[str]:
 
 def label(a: dict, pages: bool = False) -> str:
     title = a["name"] if a.get("merged") and a.get("name") else a["title"]  # 合体した記事は、短い名前で
-    count = f"・{a['last'] - a['first'] + 1}ページ" if pages else ""
-    return f"{title.replace(chr(0x3000), ' ')}（`{a['id']}` p.{a['first']}-{a['last']}{count}）"
+    ranges = a.get("ranges") or [[a["first"], a["last"]]]  # 離れた記事の合体は、範囲が複数
+    total = sum(last - first + 1 for first, last in ranges)
+    count = f"・{total}ページ" if pages else ""
+    shown = ", ".join(f"{f}-{last}" for f, last in ranges)
+    return f"{title.replace(chr(0x3000), ' ')}（`{a['id']}` p.{shown}{count}）"
 
 
 def contents(a: dict) -> list[str]:
@@ -95,7 +98,9 @@ def render_body(plan: dict, book: str, *, purpose: str, recommend: list[str], em
         "",
         *[line for a in arts for line in item("x" if a["id"] in star else " ", a, pages=True, star=a["id"] in star)],
         "",
-        "分け方を変えたいときだけ、これをチェックして、コメントに書いてください。",
+        "章の合体・分割・ページ範囲を直したいときだけ、下のチェックを付けて、どう変えたいかをコメントに書いてください。",
+        "チェックを付けると、Claude が「上で付けたチェック」と「コメント」をあわせて読み、意図をくみ取ります。",
+        "（分け方は今のままで、補足を伝えたいだけなら、チェックは付けず、コメントだけ書いてください）",
         "",
         f"- [ ] {CHANGE}",
         "",
@@ -126,8 +131,8 @@ def render_body(plan: dict, book: str, *, purpose: str, recommend: list[str], em
         "",
         f"- [ ] {START}",
         "",
-        "Claude のセッションが開いている間は、「作業開始OK」が付いたら自動で反映して次へ進みます（合図は要りません）。",
-        "セッションが閉じているときは、次に開いたときに「答えたよ」と伝えてください。",
+        "「作業開始OK」が付くと、自動で反映して次へ進みます（合図は要りません）。",
+        "画面で答えることもできます（回答フォームと、Claude とのやりとり）。",
     ]
     return "\n".join(out) + "\n"
 

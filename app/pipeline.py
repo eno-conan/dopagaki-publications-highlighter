@@ -8,6 +8,7 @@
 1. `build_issue.py`: 対象の記事を切り出して、マーカーを付ける
 2. `check_links.py`: `references/*.json` のリンクを取得して確認する
 3. `post_references.py --sync`: 確認できたリンクだけを、章ごとに Issue へ投稿する（すでにあれば書き換える）
+4. （`--close` で Issue を閉じたとき）その本・号の一時フォルダ `work-gai/<名前>/` を消す
 
 どこかで失敗しても、あとの手順は続ける。最後に、人が見るべきこと（マーカーの未適用、載せられなかったリンク）をまとめて表示する。
 """
@@ -23,6 +24,7 @@ import build_issue
 import check_links
 import post_references
 import repo_guard
+import start
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -71,6 +73,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             subprocess.run(["gh", "issue", "close", str(args.issue)], check=True, stdout=subprocess.DEVNULL)
             print(f"\n#{args.issue} を閉じました（マーカーと参考文献の作業が終わったため）")
+            name = args.plan.resolve().parent.name
+            if start.clean_scratch(name):
+                print(f"一時フォルダ work-gai/{name}/ を消しました")
 
     print("\n== 人が見ること")
     for line in todo or ["なし"]:
